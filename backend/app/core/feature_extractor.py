@@ -79,16 +79,37 @@ def analyze_breath_and_pauses(
     # Silence frames are frames below -top_db from peak
     is_silent = (rms_db < -top_db)
     
-    # Digital zero ratio (< 1e-4 sample threshold) and lead-in check
+    # Global digital zero ratio (< 1e-4 sample threshold) and lead-in check
     sample_zero_ratio = float(np.mean(np.abs(y) < 1.0e-4))
     lead_in_samples = min(len(y), int(0.12 * sr))
     lead_in_zero_ratio = float(np.mean(np.abs(y[:lead_in_samples]) < 1.0e-4)) if lead_in_samples > 0 else 0.0
     has_digital_zero_lead_in = bool(lead_in_zero_ratio > 0.85 and peak_rms > 0.01)
 
-    # Calculate acoustic silence floor in dB using 10th percentile (avoids boundary padding artifacts)
-    p10_raw_rms = np.percentile(rms, 10) if len(rms) > 0 else 1e-6
-    silence_floor_db = float(20 * np.log10(max(p10_raw_rms, 1e-6)))
-    if sample_zero_ratio >= 0.05:
+    # Within-silence zero ratio & acoustic silence floor
+    # Evaluates near-zero sample ratio strictly within quiet/pause frames (decoupled from speech tempo)
+    silent_mask = np.zeros(len(y), dtype=bool)
+    for idx, silent in enumerate(is_silent):
+        if silent:
+            s_start = idx * hop_length
+            s_end = min(len(y), s_start + frame_length)
+            silent_mask[s_start:s_end] = True
+
+    if np.any(silent_mask):
+        within_silence_zero_ratio = float(np.mean(np.abs(y[silent_mask]) < 1.0e-4))
+        sil_rms_db = 20 * np.log10(np.maximum(rms[is_silent], 1e-6))
+        silence_floor_db = float(np.percentile(sil_rms_db, 10))
+    else:
+        # Fallback for continuous speech without pauses > top_db: lowest 15% energy frames
+        low_idx = np.argsort(rms)[:max(1, int(0.15 * len(rms)))]
+        low_mask = np.zeros(len(y), dtype=bool)
+        for idx in low_idx:
+            low_mask[idx * hop_length : min(len(y), idx * hop_length + frame_length)] = True
+        within_silence_zero_ratio = float(np.mean(np.abs(y[low_mask]) < 1.0e-4))
+        sil_rms_db = 20 * np.log10(np.maximum(rms[low_idx], 1e-6))
+        silence_floor_db = float(np.percentile(sil_rms_db, 10))
+
+    # Synthetic silence override: if quiet regions have >= 10% zeros, floor is synthetic
+    if within_silence_zero_ratio >= 0.10 or sample_zero_ratio >= 0.05:
         silence_floor_db = min(silence_floor_db, -85.0)
 
     # Find contiguous silent intervals
@@ -155,6 +176,7 @@ def analyze_breath_and_pauses(
         "breaths_detected": breaths_detected,
         "breath_pause_ratio": round(breath_ratio, 2),
         "digital_zero_ratio": round(sample_zero_ratio, 4),
+        "within_silence_zero_ratio": round(within_silence_zero_ratio, 4),
         "has_digital_zero_lead_in": has_digital_zero_lead_in,
         "pause_intervals": [
             {"start_sec": round(s / sr, 3), "end_sec": round(e / sr, 3)}
@@ -324,6 +346,7 @@ def extract_acoustic_features(y: np.ndarray, sr: int = 16000) -> Dict[str, Any]:
         "pause_std_sec": pause_metrics["pause_std_sec"],
         "silence_floor_db": pause_metrics["silence_floor_db"],
         "digital_zero_ratio": pause_metrics["digital_zero_ratio"],
+        "within_silence_zero_ratio": pause_metrics["within_silence_zero_ratio"],
         "has_digital_zero_lead_in": pause_metrics["has_digital_zero_lead_in"],
         "breaths_detected": pause_metrics["breaths_detected"],
         "breath_pause_ratio": pause_metrics["breath_pause_ratio"],

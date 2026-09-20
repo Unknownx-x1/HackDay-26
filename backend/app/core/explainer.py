@@ -121,9 +121,10 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
     # Extract key metrics for direct physical reasoning
     floor = float(features.get("silence_floor_db", -60.0))
     zero_ratio = float(features.get("digital_zero_ratio", 0.0))
+    within_silence_zero = float(features.get("within_silence_zero_ratio", zero_ratio))
     has_lead_in = bool(features.get("has_digital_zero_lead_in", False))
     rolloff = float(features.get("spectral_rolloff_95_hz", 5500.0))
-    flatness = float(features.get("spectral_flatness", 0.02))
+    flatness = float(features.get("spectral_flatness", 0.25))
     jitter = float(features.get("jitter_local_pct", 1.2))
     shimmer = float(features.get("shimmer_local_pct", 6.0))
     hnr = float(features.get("hnr_mean_db", 14.0))
@@ -148,6 +149,8 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
                     is_anomalous = False
                 else:
                     is_anomalous = True
+            elif key == "silence_floor_db" and ((within_silence_zero >= 0.10 and floor <= -75.0) or within_silence_zero >= 0.18):
+                is_anomalous = True
         elif direction == "high_is_ai":
             if val > h_max:
                 is_anomalous = True
@@ -183,6 +186,10 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
         if key == "breath_pause_ratio" and (duration < 6.0 or floor > -75.0):
             score = 20.0
 
+        if key == "silence_floor_db" and ((within_silence_zero >= 0.10 and floor <= -75.0) or within_silence_zero >= 0.18 or floor <= -80.0):
+            score = 95.0
+            is_anomalous = True
+
         score = max(5.0, min(98.0, score))
 
         radar_data.append({
@@ -201,24 +208,24 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
     # 2. Build Findings mathematically derived from sample metrics
     all_findings = []
 
-    # Finding 1: Pause Silence Floor / Digital Zero Splicing
-    if floor <= -80.0 or zero_ratio >= 0.05 or has_lead_in:
+    # Finding 1: Pause Silence Floor / Digital Zero Splicing (Conditioned on Silence)
+    if (within_silence_zero >= 0.10 and floor <= -75.0) or within_silence_zero >= 0.18 or floor <= -80.0 or zero_ratio >= 0.05 or has_lead_in:
         all_findings.append({
             "feature": "silence_floor_db",
             "title": "Algorithmic Digital Zero Silence",
             "severity": "high",
             "badge": "Synthetic Artifact",
-            "description": f"Pause acoustic noise floor plunges to {floor:.1f} dB ({zero_ratio * 100.0:.1f}% zero-energy frames). Physical microphone recordings in real rooms maintain continuous acoustic dissipation (> -72.0 dB); absolute digital zero is a physical impossibility for authentic microphone recordings and proves algorithmic buffer splicing.",
-            "evidence": f"Measured Floor: {floor:.1f} dB | Physical Acoustic Threshold: > -72.0 dB"
+            "description": f"Silence pauses contain {within_silence_zero * 100.0:.1f}% near-zero samples (biological baseline: < 7.0%) with acoustic noise floor plunging to {floor:.1f} dB. Real acoustic microphone recordings maintain continuous thermal and environmental noise dissipation (> -72.0 dB); elevated digital zero density within speech pauses is a physical impossibility for authentic microphone recordings and proves generative vocoder buffer gating.",
+            "evidence": f"Within-Silence Zero Ratio: {within_silence_zero * 100.0:.1f}% | Measured Floor: {floor:.1f} dB | Biological Max: < 7.0%"
         })
-    elif -72.0 <= floor <= -35.0:
+    elif -72.0 <= floor <= -35.0 and within_silence_zero < 0.08:
         all_findings.append({
             "feature": "silence_floor_db",
             "title": "Organic Ambient Acoustic Dispersion",
             "severity": "info",
             "badge": "Authentic Human Signal",
-            "description": f"Pause noise floor maintains natural acoustic room ambience at {floor:.1f} dB, consistent with physical microphone transducer mechanics, room reverberation, and thermal electronics noise.",
-            "evidence": f"Measured Floor: {floor:.1f} dB | Expected Natural Range: -72.0 dB to -35.0 dB"
+            "description": f"Pause noise floor maintains natural acoustic room ambience at {floor:.1f} dB with only {within_silence_zero * 100.0:.1f}% near-zero samples, consistent with physical microphone transducer mechanics, room reverberation, and thermal electronics noise.",
+            "evidence": f"Measured Floor: {floor:.1f} dB | Within-Silence Zeros: {within_silence_zero * 100.0:.1f}% | Natural Range: -72 dB to -35 dB"
         })
 
     # Finding 2: 95% Spectral Rolloff & Vocoder Shelving

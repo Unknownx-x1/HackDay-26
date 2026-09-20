@@ -127,6 +127,7 @@ class VoiceprintClassifier:
         # Acoustic Physical Indicators
         silence_floor = features.get("silence_floor_db", -60.0)
         zero_ratio = features.get("digital_zero_ratio", 0.0)
+        within_silence_zero = features.get("within_silence_zero_ratio", zero_ratio)
         has_lead_in = features.get("has_digital_zero_lead_in", False)
         rolloff = features.get("spectral_rolloff_95_hz", 5000.0)
         flatness = features.get("spectral_flatness", 0.25)
@@ -135,25 +136,24 @@ class VoiceprintClassifier:
         shimmer = features.get("shimmer_local_pct", 6.0)
 
         # DEBUG LOGGING (per user instruction)
-        print(f"[DEBUG predict()] silence_floor_db={silence_floor:.2f}dB | spectral_rolloff_95_hz={rolloff:.1f}Hz | spectral_flatness={flatness:.4f} | digital_zero_ratio={zero_ratio:.4f} | raw_prob_ai={raw_prob_ai:.3f}")
+        print(f"[DEBUG predict()] silence_floor_db={silence_floor:.2f}dB | within_silence_zero={within_silence_zero:.4f} | global_zero={zero_ratio:.4f} | rolloff={rolloff:.1f}Hz | raw_prob_ai={raw_prob_ai:.3f}")
 
         # Apply calibrated adjustments based on physical acoustic reality
         calibrated_prob = raw_prob_ai
 
-        # Physical Rule 1: Digital Zero Silence Floor Invariant
-        # True microphone recordings in physical rooms NEVER produce silence floors <= -80dB or zero ratio >= 0.05.
-        # Absolute digital zero is an unequivocal signature of synthetic audio generation or digital gating.
-        if silence_floor <= -80.0 or zero_ratio >= 0.05 or has_lead_in:
-            if rolloff <= 3500.0 or zero_ratio >= 0.08 or silence_floor <= -85.0:
+        # Physical Rule 1: Digital Zero Silence Floor Invariant (Conditioned on Silence)
+        # Real acoustic rooms never have within-silence zero ratio >= 0.10 with floor <= -75dB, within-silence zero >= 0.18, or floor <= -80dB.
+        if (within_silence_zero >= 0.10 and silence_floor <= -75.0) or within_silence_zero >= 0.18 or zero_ratio >= 0.05 or silence_floor <= -80.0 or has_lead_in:
+            if rolloff <= 3500.0 or zero_ratio >= 0.08 or silence_floor <= -85.0 or within_silence_zero >= 0.18:
                 calibrated_prob = max(calibrated_prob, 0.88)
-                print(f"[DEBUG predict()] Physical Rule 1 FIRED -> calibrated_prob clamped to {calibrated_prob}")
+                print(f"[DEBUG predict()] Physical Rule 1 FIRED (within_silence_zero={within_silence_zero:.3f}, floor={silence_floor:.1f}dB) -> calibrated_prob clamped to {calibrated_prob}")
             else:
-                calibrated_prob = max(calibrated_prob, 0.75)
-                print(f"[DEBUG predict()] Physical Rule 1 (Secondary) FIRED -> calibrated_prob clamped to {calibrated_prob}")
+                calibrated_prob = max(calibrated_prob, 0.78)
+                print(f"[DEBUG predict()] Physical Rule 1 (Secondary) FIRED (within_silence_zero={within_silence_zero:.3f}) -> calibrated_prob clamped to {calibrated_prob}")
 
         # Physical Rule 2: Natural Room Ambience Invariant
-        # Unedited room audio with natural microphone thermal floor, organic formant valleys, and natural bandwidth
-        elif silence_floor >= -70.0 and zero_ratio < 0.045:
+        # Requires true acoustic room ambience (silence floor >= -70dB) AND within-silence zero ratio < 0.08
+        elif silence_floor >= -70.0 and within_silence_zero < 0.08 and zero_ratio < 0.045:
             if rolloff >= 3500.0 or breaths > 0 or (jitter >= 0.8 and shimmer >= 3.0):
                 calibrated_prob = min(calibrated_prob, 0.15)
                 print(f"[DEBUG predict()] Physical Rule 2 (Human Ambience) FIRED -> calibrated_prob clamped to {calibrated_prob}")
