@@ -3,7 +3,11 @@ import csv
 import numpy as np
 import soundfile as sf
 from scipy.signal import butter, lfilter
-import pyttsx3
+
+try:
+    import pyttsx3
+except ImportError:
+    pyttsx3 = None
 
 from .audio_processor import load_audio
 from .feature_extractor import extract_acoustic_features
@@ -174,6 +178,9 @@ def synthesize_acoustic_ai(
 
 def generate_tts_speech(text: str, filename: str) -> bool:
     """Uses pyttsx3 to synthesize actual spoken English audio."""
+    if pyttsx3 is None:
+        print("pyttsx3 not available (headless server), skipping TTS generation.")
+        return False
     try:
         engine = pyttsx3.init()
         engine.setProperty('rate', 150)
