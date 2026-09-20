@@ -51,9 +51,9 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
           <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-zinc-600 mb-1">
             <span>Pitch Jitter (Local)</span>
             <span className={`px-1.5 py-0.5 border-2 border-black text-[9px] font-black shadow-[1px_1px_0px_#000] ${
-              f.jitter_local_pct < 0.5 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
+              f.jitter_local_pct < 0.80 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
             }`}>
-              {f.jitter_local_pct < 0.5 ? 'SUPPRESSED' : 'NATURAL'}
+              {f.jitter_local_pct < 0.80 ? 'SUPPRESSED' : 'NATURAL'}
             </span>
           </div>
           <div className="text-3xl font-black font-mono text-black">
@@ -61,7 +61,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
             <span className="text-xs text-zinc-500 font-normal ml-0.5">%</span>
           </div>
           <div className="text-[10px] font-mono text-zinc-600 mt-2 pt-2 border-t-2 border-black">
-            Human baseline: <span className="font-black text-black">0.50% – 1.80%</span>
+            Human baseline: <span className="font-black text-black">0.80% – 2.80%</span>
           </div>
         </div>
 
@@ -70,9 +70,9 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
           <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-zinc-600 mb-1">
             <span>Amplitude Shimmer</span>
             <span className={`px-1.5 py-0.5 border-2 border-black text-[9px] font-black shadow-[1px_1px_0px_#000] ${
-              f.shimmer_local_pct < 2.0 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
+              f.shimmer_local_pct < 4.0 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
             }`}>
-              {f.shimmer_local_pct < 2.0 ? 'SUPPRESSED' : 'NATURAL'}
+              {f.shimmer_local_pct < 4.0 ? 'SUPPRESSED' : 'NATURAL'}
             </span>
           </div>
           <div className="text-3xl font-black font-mono text-black">
@@ -80,7 +80,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
             <span className="text-xs text-zinc-500 font-normal ml-0.5">%</span>
           </div>
           <div className="text-[10px] font-mono text-zinc-600 mt-2 pt-2 border-t-2 border-black">
-            Human baseline: <span className="font-black text-black">2.20% – 6.50%</span>
+            Human baseline: <span className="font-black text-black">4.0% – 15.0%</span>
           </div>
         </div>
 
@@ -89,9 +89,9 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
           <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-zinc-600 mb-1">
             <span>Harmonics-to-Noise</span>
             <span className={`px-1.5 py-0.5 border-2 border-black text-[9px] font-black shadow-[1px_1px_0px_#000] ${
-              f.hnr_mean_db > 22.0 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
+              f.hnr_mean_db > 18.0 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
             }`}>
-              {f.hnr_mean_db > 22.0 ? 'STERILE' : 'NATURAL'}
+              {f.hnr_mean_db > 18.0 ? 'STERILE' : 'NATURAL'}
             </span>
           </div>
           <div className="text-3xl font-black font-mono text-black">
@@ -99,7 +99,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
             <span className="text-xs text-zinc-500 font-normal ml-0.5">dB</span>
           </div>
           <div className="text-[10px] font-mono text-zinc-600 mt-2 pt-2 border-t-2 border-black">
-            Human baseline: <span className="font-black text-black">11.0 – 21.0 dB</span>
+            Human baseline: <span className="font-black text-black">8.0 – 18.0 dB</span>
           </div>
         </div>
 
@@ -108,9 +108,9 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
           <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-zinc-600 mb-1">
             <span>Pause Silence Floor</span>
             <span className={`px-1.5 py-0.5 border-2 border-black text-[9px] font-black shadow-[1px_1px_0px_#000] ${
-              f.silence_floor_db < -80.0 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
+              f.silence_floor_db < -72.0 ? 'bg-red-300 text-black' : 'bg-emerald-300 text-black'
             }`}>
-              {f.silence_floor_db < -80.0 ? 'DIGITAL ZERO' : 'ROOM AMBIENT'}
+              {f.silence_floor_db < -72.0 ? 'DIGITAL ZERO' : 'ROOM AMBIENT'}
             </span>
           </div>
           <div className="text-3xl font-black font-mono text-black">
@@ -118,7 +118,7 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
             <span className="text-xs text-zinc-500 font-normal ml-0.5">dB</span>
           </div>
           <div className="text-[10px] font-mono text-zinc-600 mt-2 pt-2 border-t-2 border-black">
-            Room ambient decay: <span className="font-black text-black">&gt; -75.0 dB</span>
+            Room ambient decay: <span className="font-black text-black">&gt; -72.0 dB</span>
           </div>
         </div>
       </div>

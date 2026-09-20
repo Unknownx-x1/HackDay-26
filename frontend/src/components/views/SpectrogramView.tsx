@@ -28,8 +28,8 @@ export const SpectrogramView: React.FC<SpectrogramViewProps> = ({
   }
 
   const hfRatio = (analysisResult.features.hf_energy_ratio * 100).toFixed(1);
-  const rolloff95 = Math.round(analysisResult.features.spectral_rolloff_95_hz || 6800);
-  const flatness = (analysisResult.features.spectral_flatness || 0.015).toFixed(4);
+  const rolloff95 = Math.round(analysisResult.features.spectral_rolloff_95_hz || 0);
+  const flatness = (analysisResult.features.spectral_flatness || 0).toFixed(4);
 
   return (
     <div className="flex flex-col gap-6 text-left">
