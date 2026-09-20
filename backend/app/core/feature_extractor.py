@@ -263,8 +263,8 @@ def extract_acoustic_features(y: np.ndarray, sr: int = 16000) -> Dict[str, Any]:
     spectral_centroid_mean = float(np.mean(centroid_frames))
     spectral_centroid_std = float(np.std(centroid_frames))
 
-    rolloff_85 = librosa.feature.spectral_rolloff(S=power_stft, sr=sr, roll_percent=0.85)[0]
-    rolloff_95 = librosa.feature.spectral_rolloff(S=power_stft, sr=sr, roll_percent=0.95)[0]
+    rolloff_85 = librosa.feature.spectral_rolloff(S=stft, sr=sr, roll_percent=0.85)[0]
+    rolloff_95 = librosa.feature.spectral_rolloff(S=stft, sr=sr, roll_percent=0.95)[0]
     spectral_rolloff_85 = float(np.mean(rolloff_85))
     spectral_rolloff_95 = float(np.mean(rolloff_95))
 

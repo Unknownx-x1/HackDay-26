@@ -17,7 +17,7 @@ ACOUSTIC_NORMS = {
         "name": "Amplitude Shimmer",
         "unit": "%",
         "human_min": 4.0,
-        "human_max": 12.0,
+        "human_max": 15.0,
         "human_mean": 7.5,
         "ai_typical": 1.5,
         "direction": "low_is_ai",  # AI has sterile uniform glottal pulses
@@ -36,7 +36,7 @@ ACOUSTIC_NORMS = {
     "hnr_std_db": {
         "name": "HNR Prosodic Variance",
         "unit": "dB",
-        "human_min": 4.0,
+        "human_min": 3.5,
         "human_max": 9.0,
         "human_mean": 6.2,
         "ai_typical": 2.5,
@@ -46,7 +46,7 @@ ACOUSTIC_NORMS = {
     "cpp": {
         "name": "Cepstral Peak Prominence (CPP)",
         "unit": "",
-        "human_min": 0.07,
+        "human_min": 0.06,
         "human_max": 0.22,
         "human_mean": 0.13,
         "ai_typical": 0.26,
@@ -56,22 +56,22 @@ ACOUSTIC_NORMS = {
     "spectral_flatness": {
         "name": "Spectral Flatness",
         "unit": "",
-        "human_min": 0.008,
-        "human_max": 0.050,
-        "human_mean": 0.022,
-        "ai_typical": 0.160,
+        "human_min": 0.140,
+        "human_max": 0.360,
+        "human_mean": 0.250,
+        "ai_typical": 0.290,
         "direction": "high_is_ai",  # Neural vocoders generate diffuse high-band noise and phase smearing
-        "description": "Measures spectral peakedness vs uniform noise. Neural vocoders exhibit diffuse spectral smearing across high frequencies."
+        "description": "Measures spectral peakedness vs uniform noise. In continuous conversational speech, empirical human baseline spans 0.140–0.360 due to conversational pauses and unvoiced consonants. Elevated flatness (> 0.420) reflects diffuse vocoder phase smearing."
     },
     "spectral_rolloff_95_hz": {
         "name": "95% Spectral Rolloff",
         "unit": "Hz",
-        "human_min": 4800.0,
-        "human_max": 7800.0,
-        "human_mean": 6200.0,
-        "ai_typical": 3900.0,
-        "direction": "low_is_ai",  # Neural vocoders frequently attenuate above 4kHz
-        "description": "Upper frequency containing 95% of spectral power. Neural vocoders frequently demonstrate steep brickwall attenuation around 4 kHz."
+        "human_min": 3500.0,
+        "human_max": 7600.0,
+        "human_mean": 5200.0,
+        "ai_typical": 3000.0,
+        "direction": "low_is_ai",  # Neural vocoders frequently attenuate above 3.5kHz
+        "description": "Upper frequency containing 95% of spectral magnitude. Brickwall attenuation below 3400 Hz indicates neural vocoder decimation from downsampled mel-spectrogram training."
     },
     "silence_floor_db": {
         "name": "Pause Silence Floor",
@@ -143,8 +143,8 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
         is_anomalous = False
         if direction == "low_is_ai":
             if val < h_min:
-                # Breaths require sufficient duration
-                if key == "breath_pause_ratio" and duration < 4.0 and floor > -75.0:
+                # Breaths require sufficient duration; on short clips or natural floor, absence of breath is normal
+                if key == "breath_pause_ratio" and (duration < 6.0 or floor > -75.0):
                     is_anomalous = False
                 else:
                     is_anomalous = True
@@ -180,7 +180,7 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
             else:
                 score = 15.0 + ((val - h_min) / max(0.001, h_max - h_min)) * 25.0
 
-        if key == "breath_pause_ratio" and duration < 4.0 and floor > -75.0:
+        if key == "breath_pause_ratio" and (duration < 6.0 or floor > -75.0):
             score = 20.0
 
         score = max(5.0, min(98.0, score))
@@ -222,43 +222,43 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
         })
 
     # Finding 2: 95% Spectral Rolloff & Vocoder Shelving
-    if rolloff <= 4400.0:
+    if rolloff <= 3200.0:
         all_findings.append({
             "feature": "spectral_rolloff_95_hz",
             "title": "Neural Vocoder Bandwidth Shelf",
             "severity": "medium",
             "badge": "Synthetic Artifact",
-            "description": f"95% spectral energy cuts off abruptly at {rolloff:.0f} Hz (natural uncompressed speech: > 4800 Hz). This brickwall shelving indicates neural vocoder decimation typical of models trained on downsampled mel-spectrograms.",
-            "evidence": f"Measured Rolloff: {rolloff:.0f} Hz | Human Sibilance Floor: > 4800 Hz"
+            "description": f"95% spectral energy cuts off abruptly at {rolloff:.0f} Hz (natural uncompressed speech: > 3500 Hz). This brickwall shelving indicates neural vocoder decimation typical of models trained on downsampled mel-spectrograms.",
+            "evidence": f"Measured Rolloff: {rolloff:.0f} Hz | Human Sibilance Floor: > 3500 Hz"
         })
-    elif rolloff >= 5000.0:
+    elif rolloff >= 3500.0:
         all_findings.append({
             "feature": "spectral_rolloff_95_hz",
             "title": "Full-Spectrum Articulatory Dispersion",
             "severity": "info",
             "badge": "Authentic Human Signal",
             "description": f"Acoustic energy spans up to {rolloff:.0f} Hz, displaying organic uncompressed sibilant friction ('s', 'sh', 'f') and unconstrained vocal tract harmonics.",
-            "evidence": f"Measured Rolloff: {rolloff:.0f} Hz | Natural Baseline: > 5000 Hz"
+            "evidence": f"Measured Rolloff: {rolloff:.0f} Hz | Natural Baseline: > 3500 Hz"
         })
 
     # Finding 3: Spectral Flatness & Phase Smearing
-    if flatness >= 0.075:
+    if flatness >= 0.420:
         all_findings.append({
             "feature": "spectral_flatness",
             "title": "Vocoder Spectral Dispersion & Phase Smearing",
             "severity": "medium",
             "badge": "Synthetic Artifact",
-            "description": f"Spectral flatness is elevated to {flatness:.3f} (human baseline: 0.008–0.050). Neural vocoders introduce diffuse pseudo-random phase smearing across unvoiced frequency bins rather than distinct biological formant notches.",
-            "evidence": f"Measured Flatness: {flatness:.3f} | Human Normal: 0.008–0.050"
+            "description": f"Spectral flatness is elevated to {flatness:.3f} (human continuous baseline: 0.140–0.360). Neural vocoders introduce diffuse pseudo-random phase smearing across unvoiced frequency bins rather than distinct biological formant notches.",
+            "evidence": f"Measured Flatness: {flatness:.3f} | Human Normal: 0.140–0.360"
         })
-    elif flatness <= 0.045:
+    elif 0.140 <= flatness <= 0.380:
         all_findings.append({
             "feature": "spectral_flatness",
             "title": "Formant Peak-to-Valley Resonance",
             "severity": "info",
             "badge": "Authentic Human Signal",
-            "description": f"Spectral flatness is low ({flatness:.3f}), reflecting well-defined resonant vocal tract formant peaks and deep harmonic troughs characteristic of human pharyngeal articulation.",
-            "evidence": f"Measured Flatness: {flatness:.3f} | Human Normal: 0.008–0.050"
+            "description": f"Spectral flatness is {flatness:.3f} within expected human range (0.140–0.360), reflecting well-defined resonant vocal tract formant peaks and deep harmonic troughs characteristic of human pharyngeal articulation.",
+            "evidence": f"Measured Flatness: {flatness:.3f} | Human Normal: 0.140–0.360"
         })
 
     # Finding 4: Pitch Micro-Stability & Cycle Tracking
@@ -291,14 +291,14 @@ def generate_explanations(features: Dict[str, Any], ai_prob: float) -> Dict[str,
         })
 
     # Finding 5: Inhalation Breaths & Pulmonary Dynamics
-    if floor <= -80.0 or breaths == 0:
+    if floor <= -80.0 or (duration >= 6.0 and breaths == 0):
         all_findings.append({
             "feature": "breath_pause_ratio",
             "title": "Absence of Pulmonary Inhalation Dynamics",
             "severity": "medium",
             "badge": "Synthetic Artifact",
             "description": "No genuine pre-speech pulmonary inhalation turbulence detected across pauses. Synthesized voices do not naturally breathe or model physiological thoracic expansion.",
-            "evidence": f"Inhalation Breaths: 0 | Acoustic Floor: {floor:.1f} dB"
+            "evidence": f"Inhalation Breaths: 0 | Duration: {duration:.1f}s | Acoustic Floor: {floor:.1f} dB"
         })
     elif breaths > 0 and floor > -75.0:
         all_findings.append({
